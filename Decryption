@@ -1,0 +1,49 @@
+import os
+import time
+def test_decryption(frame_id, input_video):
+
+    enc_file = f"encrypted_frames/{frame_id}.enc"
+    key_file = f"keys/{frame_id}.bin"
+
+    if not (os.path.exists(enc_file) and os.path.exists(key_file)):
+        print("Encrypted frame or key file not found.")
+        return
+
+    # Get frame dimensions from video
+    cap = cv2.VideoCapture(input_video)
+    if not cap.isOpened():
+        print("Failed to open video")
+        return
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cap.release()
+
+    frame_shape = (height, width, 3)
+    decrypted_frame = decrypt_frame(enc_file, key_file, frame_shape)
+
+    print(f"Decrypted Frame Shape: {decrypted_frame.shape}")
+    cv2_imshow(decrypted_frame)
+
+def decrypt_frame(encrypted_file, key_file, frame_shape):
+    start_time = time.time()
+    with open(key_file, "rb") as kf, open(encrypted_file, "rb") as ef:
+        key = kf.read()
+        encrypted_data = ef.read()
+
+    nonce = encrypted_data[:16]
+    ciphertext = encrypted_data[16:]
+
+    cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
+    decryptor = cipher.decryptor()
+    decrypted_data = decryptor.update(ciphertext)
+    decryption_time = time.time() - start_time
+    decrypted_frame = np.frombuffer(decrypted_data, dtype=np.uint8).reshape(frame_shape)
+    print(f"Decryption Time per Frame: {decryption_time:.4f} sec")
+    return decrypted_frame
+frame_id = input("Enter the ID of the encrypted frame to decrypt: ").strip()
+test_decryption(frame_id,"/one-by-one-person-detection.mp4" )
+
+'''start_time = time.time()
+decrypt_frame("encrypted_frames/test123.enc", "keys/test123.bin", frame.shape)
+decryption_time = time.time() - start_time
+print(f"Decryption Time per Frame: {decryption_time:.4f} sec")'''
