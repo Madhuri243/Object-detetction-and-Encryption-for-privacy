@@ -1,0 +1,72 @@
+from ultralytics import YOLO
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load a more accurate model
+model = YOLO("yolov8l.pt")  # Try 'yolov8x.pt' for even better results
+
+# Open video file
+input_video = "/content/one-by-one-person-detection1 - Copy.mp4"
+cap = cv2.VideoCapture(input_video)
+
+if not cap.isOpened():
+    print("Error: Could not open video file.")
+    exit()
+
+# Initialize counters
+total_frames = 0
+total_detections = 0  # Track total detections (all objects)
+correct_detections = 0  # Track only person detections
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    total_frames += 1  # Count frames
+
+    # **Preprocessing for better detection**
+    # 1. Convert to grayscale and apply sharpening filter
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    sharpen_filter = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+    sharp_frame = cv2.filter2D(gray, -1, sharpen_filter)
+    frame = cv2.cvtColor(sharp_frame, cv2.COLOR_GRAY2BGR)
+
+    # 2. Run YOLO detection with higher confidence and IoU
+    results = model(frame, conf=0.4, iou=0.6)  # Higher confidence & IoU
+
+    for result in results:
+        if result.boxes is not None and len(result.boxes.cls) > 0:
+            class_ids = result.boxes.cls.cpu().numpy()
+
+            # **Filter out only person detections**
+            person_detections = np.sum(class_ids == 0)
+            correct_detections += person_detections
+            total_detections += len(class_ids)
+
+cap.release()
+
+# Calculate and print accuracy
+if total_detections > 0:
+    accuracy = correct_detections / total_detections * 100
+    print(f"Detection Accuracy: {accuracy:.2f}%")
+else:
+    accuracy = 0
+    print("No detections found, accuracy is 0%")
+
+# Plot the results only if there were detections
+if total_detections > 0:
+    labels = ['Total Detections', 'Person Detections', 'Accuracy (%)']
+    values = [total_detections, correct_detections, accuracy]
+
+    plt.figure(figsize=(8, 5))
+    plt.bar(labels, values, color=['blue', 'green', 'orange'])
+    plt.xlabel("Detection Metrics")
+    plt.ylabel("Count / Percentage")
+    plt.title("YOLOv8 Detection Performance")
+    plt.ylim(0, max(values) + 10)  # Adjust y-axis limit for better visibility
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.show()
+else:
+    print("No detections available for graph plotting.")
